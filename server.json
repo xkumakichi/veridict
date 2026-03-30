@@ -1,0 +1,22 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.xkumakichi/veridict",
+  "description": "Know if you can trust your MCP server. Trust judgment for AI agents.",
+  "version": "0.1.0",
+  "license": "MIT",
+  "homepage": "https://github.com/xkumakichi/veridict",
+  "repository": {
+    "url": "https://github.com/xkumakichi/veridict.git",
+    "source": "github"
+  },
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "veridict",
+      "version": "0.1.0",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}
