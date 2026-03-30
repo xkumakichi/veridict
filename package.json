@@ -1,0 +1,41 @@
+{
+  "name": "veridict",
+  "version": "0.1.0",
+  "description": "Know if you can trust your MCP server. Execution verification + trust judgment for AI agents.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "veridict": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/cli.js"
+  },
+  "keywords": [
+    "mcp",
+    "ai",
+    "agent",
+    "trust",
+    "verification",
+    "middleware",
+    "observability"
+  ],
+  "author": "Hiro (xkumakichi)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xkumakichi/veridict"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "sql.js": "^1.11.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
