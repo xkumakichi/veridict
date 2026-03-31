@@ -44,7 +44,12 @@ export function withVeridict(server: McpServer, options: VerdictOptions): Verdic
     if (verbose) console.error(`[veridict] ${msg}`);
   };
 
+  const baseline = options.baseline;
+
   log(`monitoring "${serverName}"`);
+  if (baseline) {
+    log(`static baseline loaded (score: ${baseline.score ?? "n/a"}, risks: ${baseline.risks?.length ?? 0})`);
+  }
 
   // --- Wrap all registered tool handlers ---
   const registeredTools = (server as any)._registeredTools as Map<string, any> | undefined;
@@ -130,7 +135,7 @@ export function withVeridict(server: McpServer, options: VerdictOptions): Verdic
       tool_name: z.string().optional().describe("Specific tool to check (optional)"),
     },
     async ({ server_name, tool_name }) => {
-      const verdict = await canITrust(store, server_name, tool_name, minExecutions);
+      const verdict = await canITrust(store, server_name, tool_name, minExecutions, baseline);
 
       return {
         content: [{ type: "text" as const, text: JSON.stringify(verdict, null, 2) }],

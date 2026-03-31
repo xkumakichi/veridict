@@ -49,4 +49,28 @@ export interface VerdictOptions {
   minExecutions?: number;
   /** Log tool executions to stderr. Default: false */
   verbose?: boolean;
+  /** Static analysis baseline from MCP Trust Kit (--json-out). Enhances trust judgment with pre-deployment risk context. */
+  baseline?: StaticBaseline;
+}
+
+/** Static analysis baseline from Layer 1 (e.g., MCP Trust Kit --json-out) */
+export interface StaticBaseline {
+  /** Aggregate risk score from static analysis (0-100, higher = riskier) */
+  score?: number;
+  /** Timestamp of when the scan was performed (ISO 8601) */
+  scanTimestamp?: string;
+  /** Tool-specific risk flags from static analysis */
+  risks?: StaticRisk[];
+  /** Raw JSON from the scanner (preserved for Layer 3 consumption) */
+  raw?: Record<string, unknown>;
+}
+
+/** A risk flag from static analysis */
+export interface StaticRisk {
+  /** Tool or capability name */
+  tool: string;
+  /** Risk type (e.g., "dangerous_fs_write", "network_access") */
+  type: string;
+  /** Severity: low, medium, high, critical */
+  severity: "low" | "medium" | "high" | "critical";
 }
