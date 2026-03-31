@@ -2,6 +2,8 @@
 
 **Know if you can trust your MCP server.**
 
+Agents call tools. Some fail silently. Veridict gives you a signal.
+
 Part of the emerging [Agent Trust Stack](https://github.com/aak204/MCP-Trust-Kit/issues/1) (Runtime Verification Layer).
 
 ## Quickstart (30 seconds)
@@ -29,6 +31,8 @@ can_I_trust("my-server")?
 
   verdict: "yes"
   confidence: 0.99
+  success_rate: 0.992
+  total_executions: 1247
   reason: "success_rate 99.2% over 1247 executions"
 ```
 
