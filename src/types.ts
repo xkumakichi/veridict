@@ -47,4 +47,6 @@ export interface VerdictOptions {
   dbPath?: string;
   /** Minimum executions before trust judgment. Default: 10 */
   minExecutions?: number;
+  /** Log tool executions to stderr. Default: false */
+  verbose?: boolean;
 }

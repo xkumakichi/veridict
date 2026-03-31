@@ -38,6 +38,13 @@ export function withVeridict(server: McpServer, options: VerdictOptions): Verdic
     ? `${options.name}:${options.instanceId}`
     : options.name;
   const minExecutions = options.minExecutions ?? 10;
+  const verbose = options.verbose ?? false;
+
+  const log = (msg: string) => {
+    if (verbose) console.error(`[veridict] ${msg}`);
+  };
+
+  log(`monitoring "${serverName}"`);
 
   // --- Wrap all registered tool handlers ---
   const registeredTools = (server as any)._registeredTools as Map<string, any> | undefined;
@@ -70,6 +77,7 @@ export function withVeridict(server: McpServer, options: VerdictOptions): Verdic
             timestamp: new Date().toISOString(),
           });
 
+          log(`${toolName} ok ${latencyMs}ms`);
           return result;
         } catch (error: any) {
           const latencyMs = Date.now() - startTime;
@@ -85,6 +93,7 @@ export function withVeridict(server: McpServer, options: VerdictOptions): Verdic
             timestamp: new Date().toISOString(),
           });
 
+          log(`${toolName} FAIL ${latencyMs}ms — ${error?.message || error}`);
           throw error;
         }
       };
