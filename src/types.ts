@@ -55,9 +55,9 @@ export interface VerdictOptions {
 
 /** Static analysis baseline from Layer 1 (e.g., MCP Trust Kit --json-out) */
 export interface StaticBaseline {
-  /** Aggregate risk score from static analysis (0-100, higher = riskier) */
+  /** Aggregate trust score from static analysis (0-100, higher = safer). Maps to MCP Trust Kit's total_score. */
   score?: number;
-  /** Timestamp of when the scan was performed (ISO 8601) */
+  /** Timestamp of when the scan was performed (ISO 8601). Maps to MCP Trust Kit v0.5.0 scan_timestamp. */
   scanTimestamp?: string;
   /** Tool-specific risk flags from static analysis */
   risks?: StaticRisk[];

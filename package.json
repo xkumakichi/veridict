@@ -1,6 +1,6 @@
 {
   "name": "veridict",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Know if you can trust your MCP server. Execution verification + trust judgment for AI agents.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

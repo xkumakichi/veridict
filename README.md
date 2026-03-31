@@ -83,6 +83,38 @@ withVeridict(server, {
 });
 ```
 
+## Layer 1 integration (MCP Trust Kit)
+
+Combine static analysis with runtime monitoring for full-stack trust:
+
+```bash
+# Step 1: Static scan with MCP Trust Kit (v0.5.0+)
+npx mcp-trust-kit scan --json-out layer1-baseline.json --cmd node my-server.js
+```
+
+```typescript
+import { withVeridict, parseLayer1Report } from "veridict";
+import report from "./layer1-baseline.json";
+
+withVeridict(server, {
+  name: "my-server",
+  baseline: parseLayer1Report(report),  // Layer 1 → Layer 2
+});
+```
+
+What this does:
+- Static risks (e.g., `dangerous_fs_write`) are factored into trust judgment
+- Critical static risks downgrade a "yes" verdict to "caution" even at 99% success rate
+- `scan_timestamp` is preserved for Layer 3 temporal decay logic
+- The full Layer 1 report is stored in `baseline.raw` for cross-org consumers
+
+Part of the [Agent Trust Stack](https://github.com/aak204/MCP-Trust-Kit/issues/1):
+```
+Layer 1: MCP Trust Kit (pre-deploy)  → "Is this server safe to run?"
+Layer 2: Veridict (runtime)          → "Is this server actually reliable?"
+Layer 3: SATP/XAIP (cross-org)      → "Should I trust this across boundaries?"
+```
+
 ## How it works
 
 1. Wraps all registered MCP tool handlers
