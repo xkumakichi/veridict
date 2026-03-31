@@ -80,6 +80,11 @@ Veridict is the trust layer for the AI agent economy. Current version stores log
 - Replay verification
 - Enterprise compliance reporting
 
+## Early users welcome
+
+If you're building MCP servers or agents, I'd love your feedback.
+Try Veridict and tell me what breaks.
+
 ## License
 
 MIT
