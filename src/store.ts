@@ -7,7 +7,7 @@ import initSqlJs, { Database } from "sql.js";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
-import { ExecutionEntry, ToolStats } from "./types";
+import { ExecutionEntry, ToolStats, FailureType } from "./types";
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS executions (
@@ -53,7 +53,18 @@ export class VerdictStore {
     }
 
     this.db.run(SCHEMA);
+    this.migrate();
     this.save();
+  }
+
+  /** Add columns for newer versions (safe to run on existing DBs) */
+  private migrate(): void {
+    if (!this.db) return;
+    try {
+      this.db.run("ALTER TABLE executions ADD COLUMN failure_type TEXT DEFAULT NULL");
+    } catch {
+      // Column already exists — ignore
+    }
   }
 
   private save(): void {
@@ -73,8 +84,8 @@ export class VerdictStore {
   async logExecution(entry: ExecutionEntry): Promise<void> {
     const db = await this.ensureReady();
     db.run(
-      `INSERT INTO executions (server_name, tool_name, input_hash, output_hash, success, latency_ms, error_message, timestamp)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO executions (server_name, tool_name, input_hash, output_hash, success, latency_ms, error_message, failure_type, timestamp)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         entry.serverName,
         entry.toolName,
@@ -83,6 +94,7 @@ export class VerdictStore {
         entry.success ? 1 : 0,
         entry.latencyMs,
         entry.errorMessage,
+        entry.failureType || null,
         entry.timestamp || new Date().toISOString(),
       ]
     );
@@ -121,6 +133,74 @@ export class VerdictStore {
         avgLatencyMs: 0,
         lastFailure: null,
         lastExecution: null,
+        failureBreakdown: {},
+      };
+    }
+
+    const [total, successCount, failureCount, avgLatency, lastFailure, lastExecution] =
+      row[0].values[0];
+
+    const totalNum = Number(total) || 0;
+    const successNum = Number(successCount) || 0;
+
+    // Get failure breakdown
+    const fbRows = db.exec(
+      `SELECT COALESCE(failure_type, 'unknown') as ft, COUNT(*) as cnt
+       FROM executions ${where} AND success = 0
+       GROUP BY ft`,
+      params
+    );
+    const failureBreakdown: Record<string, number> = {};
+    if (fbRows.length && fbRows[0].values.length) {
+      for (const r of fbRows[0].values) {
+        failureBreakdown[r[0] as string] = Number(r[1]) || 0;
+      }
+    }
+
+    return {
+      serverName,
+      toolName: toolName || null,
+      totalExecutions: totalNum,
+      successCount: successNum,
+      failureCount: Number(failureCount) || 0,
+      successRate: totalNum > 0 ? successNum / totalNum : 0,
+      avgLatencyMs: Math.round(Number(avgLatency) || 0),
+      lastFailure: (lastFailure as string) || null,
+      lastExecution: (lastExecution as string) || null,
+      failureBreakdown,
+    };
+  }
+
+  /** Get stats for recent executions only (last N days) */
+  async getRecentStats(serverName: string, toolName?: string, days: number = 7): Promise<ToolStats> {
+    const db = await this.ensureReady();
+
+    const timeFilter = `AND timestamp > datetime('now', '-${days} days')`;
+    const where = toolName
+      ? `WHERE server_name = ? AND tool_name = ? ${timeFilter}`
+      : `WHERE server_name = ? ${timeFilter}`;
+    const params = toolName ? [serverName, toolName] : [serverName];
+
+    const row = db.exec(
+      `SELECT
+        COUNT(*) as total,
+        SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END) as success_count,
+        SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END) as failure_count,
+        AVG(latency_ms) as avg_latency,
+        MAX(CASE WHEN success = 0 THEN timestamp ELSE NULL END) as last_failure,
+        MAX(timestamp) as last_execution
+      FROM executions ${where}`,
+      params
+    );
+
+    if (!row.length || !row[0].values.length) {
+      return {
+        serverName,
+        toolName: toolName || null,
+        totalExecutions: 0, successCount: 0, failureCount: 0,
+        successRate: 0, avgLatencyMs: 0,
+        lastFailure: null, lastExecution: null,
+        failureBreakdown: {},
       };
     }
 
@@ -140,6 +220,7 @@ export class VerdictStore {
       avgLatencyMs: Math.round(Number(avgLatency) || 0),
       lastFailure: (lastFailure as string) || null,
       lastExecution: (lastExecution as string) || null,
+      failureBreakdown: {},
     };
   }
 
@@ -175,6 +256,7 @@ export class VerdictStore {
       avgLatencyMs: Math.round(Number(r[4]) || 0),
       lastFailure: (r[5] as string) || null,
       lastExecution: (r[6] as string) || null,
+      failureBreakdown: {},
     }));
   }
 

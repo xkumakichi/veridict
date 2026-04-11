@@ -14,4 +14,4 @@ export { withVeridict } from "./middleware";
 export { VerdictStore } from "./store";
 export { canITrust } from "./trust";
 export { parseLayer1Report } from "./baseline";
-export type { TrustVerdict, ExecutionEntry, ToolStats, VerdictOptions, StaticBaseline, StaticRisk } from "./types";
+export type { TrustVerdict, ExecutionEntry, ToolStats, VerdictOptions, StaticBaseline, StaticRisk, FailureType } from "./types";

@@ -1,21 +1,41 @@
 /**
  * Veridict — Trust judgment logic
- * Intentionally simple. Combines runtime stats with optional static baseline.
+ * Combines runtime stats (with time decay) and optional static baseline.
  */
 
 import { VerdictStore } from "./store";
 import { TrustVerdict, StaticBaseline } from "./types";
 
 const DEFAULT_MIN_EXECUTIONS = 10;
+const RECENT_DAYS = 7;
+const RECENT_WEIGHT = 0.7;
+const ALLTIME_WEIGHT = 0.3;
+const MIN_RECENT_FOR_BLEND = 3;
+
+/** Find the most common failure type from breakdown */
+function dominantFailure(breakdown?: Record<string, number>): string | null {
+  if (!breakdown) return null;
+  let max = 0;
+  let dominant: string | null = null;
+  for (const [type, count] of Object.entries(breakdown)) {
+    if (count > max) {
+      max = count;
+      dominant = type;
+    }
+  }
+  return dominant;
+}
 
 /**
  * Judge whether a server/tool can be trusted.
  *
  * Logic:
+ * - Blends recent (7-day, 70% weight) and all-time (30% weight) success rates
  * - < minExecutions → "unknown" (insufficient data)
- * - >= 95% success → "yes" (downgraded to "caution" if static baseline has critical risks)
- * - >= 80% success → "caution"
- * - < 80% success → "no"
+ * - >= 95% blended rate → "yes" (downgraded to "caution" if critical static risks)
+ * - >= 80% blended rate → "caution"
+ * - < 80% blended rate → "no"
+ * - Failure breakdown (timeout/error/validation) included in verdict
  */
 export async function canITrust(
   store: VerdictStore,
@@ -25,65 +45,96 @@ export async function canITrust(
   baseline?: StaticBaseline
 ): Promise<TrustVerdict> {
   const stats = await store.getStats(serverName, toolName);
+  const recent = await store.getRecentStats(serverName, toolName, RECENT_DAYS);
+
+  // Compute blended success rate (recent-weighted)
+  let effectiveRate: number;
+  if (recent.totalExecutions >= MIN_RECENT_FOR_BLEND) {
+    effectiveRate = recent.successRate * RECENT_WEIGHT + stats.successRate * ALLTIME_WEIGHT;
+  } else {
+    effectiveRate = stats.successRate;
+  }
+
+  const failureBreakdown = Object.keys(stats.failureBreakdown).length > 0
+    ? stats.failureBreakdown
+    : undefined;
+
+  const recentInfo = recent.totalExecutions > 0
+    ? { recentSuccessRate: recent.successRate, recentExecutions: recent.totalExecutions }
+    : {};
+
+  const dominant = dominantFailure(failureBreakdown);
 
   // Not enough data to judge
   if (stats.totalExecutions < minExecutions) {
-    // If we have a static baseline with critical risks, flag it even without runtime data
     if (baseline?.risks?.some((r) => r.severity === "critical")) {
       return {
         verdict: "caution",
-        confidence: 0,
-        reason: `Insufficient runtime data (${stats.totalExecutions} executions) but static analysis found critical risks`,
+        score: 0,
+        reason: "insufficient data + critical static risks",
         stats,
+        failureBreakdown,
+        ...recentInfo,
       };
     }
 
     return {
       verdict: "unknown",
-      confidence: 0,
-      reason: `Insufficient data: ${stats.totalExecutions} executions (need ${minExecutions})`,
+      score: 0,
+      reason: "insufficient data",
       stats,
+      failureBreakdown,
+      ...recentInfo,
     };
   }
 
-  const pct = (stats.successRate * 100).toFixed(1);
   const hasCriticalRisks = baseline?.risks?.some((r) => r.severity === "critical");
   const hasHighRisks = baseline?.risks?.some((r) => r.severity === "high" || r.severity === "critical");
 
   // High trust — but downgrade if static baseline flags critical risks
-  if (stats.successRate >= 0.95) {
+  if (effectiveRate >= 0.95) {
     if (hasCriticalRisks) {
       return {
         verdict: "caution",
-        confidence: stats.successRate,
-        reason: `success_rate ${pct}% but static analysis found critical risks`,
+        score: effectiveRate,
+        reason: "reliable but critical static risks",
         stats,
+        failureBreakdown,
+        ...recentInfo,
       };
     }
 
     return {
       verdict: "yes",
-      confidence: stats.successRate,
-      reason: `success_rate ${pct}% over ${stats.totalExecutions} executions`,
+      score: effectiveRate,
+      reason: "reliable",
       stats,
+      failureBreakdown,
+      ...recentInfo,
     };
   }
 
   // Moderate trust
-  if (stats.successRate >= 0.8) {
+  if (effectiveRate >= 0.8) {
+    const failureHint = dominant ? `elevated ${dominant} rate` : "some failures detected";
     return {
       verdict: "caution",
-      confidence: stats.successRate,
-      reason: `success_rate ${pct}% — some failures detected (${stats.failureCount} failures)${hasHighRisks ? " + static risks" : ""}`,
+      score: effectiveRate,
+      reason: `${failureHint}${hasHighRisks ? " + static risks" : ""}`,
       stats,
+      failureBreakdown,
+      ...recentInfo,
     };
   }
 
   // Low trust
+  const failureHint = dominant ? `high ${dominant} rate` : "high failure rate";
   return {
     verdict: "no",
-    confidence: stats.successRate,
-    reason: `success_rate ${pct}% — high failure rate (${stats.failureCount}/${stats.totalExecutions} failed)`,
+    score: effectiveRate,
+    reason: failureHint,
     stats,
+    failureBreakdown,
+    ...recentInfo,
   };
 }

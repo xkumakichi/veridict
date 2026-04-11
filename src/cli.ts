@@ -89,7 +89,7 @@ async function showTrust(serverName: string, toolName?: string): Promise<void> {
 
   console.log(`\n  can_I_trust("${serverName}"${toolName ? `, "${toolName}"` : ""})?\n`);
   console.log(`  ${VERDICTS[verdict.verdict]}`);
-  console.log(`  Confidence: ${(verdict.confidence * 100).toFixed(1)}%`);
+  console.log(`  Score: ${(verdict.score * 100).toFixed(1)}%`);
   console.log(`  Reason: ${verdict.reason}\n`);
 
   await store.close();

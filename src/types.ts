@@ -3,6 +3,9 @@
  * Type definitions
  */
 
+/** Failure type classification */
+export type FailureType = "timeout" | "error" | "validation" | "unknown";
+
 /** Record of a single tool execution */
 export interface ExecutionEntry {
   id?: number;
@@ -13,6 +16,7 @@ export interface ExecutionEntry {
   success: boolean;
   latencyMs: number;
   errorMessage: string | null;
+  failureType?: FailureType;
   timestamp: string;
 }
 
@@ -27,14 +31,19 @@ export interface ToolStats {
   avgLatencyMs: number;
   lastFailure: string | null;
   lastExecution: string | null;
+  failureBreakdown: Record<string, number>;
 }
 
 /** Trust judgment result */
 export interface TrustVerdict {
   verdict: "yes" | "caution" | "no" | "unknown";
-  confidence: number;
+  /** Trust score (0-1). Blended rate: recent 70% + all-time 30%. */
+  score: number;
   reason: string;
   stats?: ToolStats;
+  recentSuccessRate?: number;
+  recentExecutions?: number;
+  failureBreakdown?: Record<string, number>;
 }
 
 /** Options for withVeridict() middleware */

@@ -14,7 +14,21 @@ import { z } from "zod";
 import * as crypto from "crypto";
 import { VerdictStore } from "./store";
 import { canITrust } from "./trust";
-import { VerdictOptions } from "./types";
+import { VerdictOptions, FailureType } from "./types";
+
+const TIMEOUT_THRESHOLD_MS = 30_000;
+
+/** Classify a failure based on error message and latency */
+function classifyFailure(error: any, latencyMs: number): FailureType {
+  const msg = (error?.message || String(error)).toLowerCase();
+  if (latencyMs >= TIMEOUT_THRESHOLD_MS || msg.includes("timeout") || msg.includes("etimedout") || msg.includes("timed out") || msg.includes("aborted")) {
+    return "timeout";
+  }
+  if (msg.includes("valid") || msg.includes("schema") || msg.includes("parse") || msg.includes("type error") || msg.includes("expected")) {
+    return "validation";
+  }
+  return "error";
+}
 
 /**
  * Hash a value for logging (SHA256, truncated to 16 hex chars)
@@ -86,6 +100,7 @@ export function withVeridict(server: McpServer, options: VerdictOptions): Verdic
           return result;
         } catch (error: any) {
           const latencyMs = Date.now() - startTime;
+          const failureType = classifyFailure(error, latencyMs);
 
           await store.logExecution({
             serverName,
@@ -95,10 +110,11 @@ export function withVeridict(server: McpServer, options: VerdictOptions): Verdic
             success: false,
             latencyMs,
             errorMessage: error?.message || String(error),
+            failureType,
             timestamp: new Date().toISOString(),
           });
 
-          log(`${toolName} FAIL ${latencyMs}ms — ${error?.message || error}`);
+          log(`${toolName} FAIL [${failureType}] ${latencyMs}ms — ${error?.message || error}`);
           throw error;
         }
       };
