@@ -26,15 +26,33 @@ Done. Every tool call is now logged. Two new tools are automatically added:
 
 ## What you get
 
+```json
+{
+  "verdict": "yes",
+  "score": 0.97,
+  "reason": "reliable",
+  "recentSuccessRate": 0.98,
+  "recentExecutions": 85,
+  "failureBreakdown": { "timeout": 2, "error": 1 },
+  "stats": {
+    "totalExecutions": 1247,
+    "successRate": 0.992,
+    "avgLatencyMs": 142
+  }
+}
 ```
-can_I_trust("my-server")?
 
-  verdict: "yes"
-  confidence: 0.99
-  success_rate: 0.992
-  total_executions: 1247
-  reason: "success_rate 99.2% over 1247 executions"
-```
+**Two-layer design:**
+- **Layer 1 (instant decision):** `verdict` + `score` + `reason` — all an agent needs
+- **Layer 2 (details on demand):** `stats` + `failureBreakdown` + `recentSuccessRate` — dig deeper when needed
+
+## v0.2.0 — What's new
+
+- **Failure classification** — failures are categorized as `timeout`, `error`, `validation`, or `unknown`
+- **Time decay** — recent executions (last 7 days) are weighted 70%, all-time 30%
+- **Trust score** — `score` field (0-1) replaces `confidence` for clearer semantics
+- **Failure breakdown** — see exactly what types of failures are occurring
+- **Agent-friendly reasons** — short, actionable: `"elevated timeout rate"`, `"reliable"`, `"high error rate"`
 
 ## Verbose mode
 
@@ -50,7 +68,7 @@ Output (stderr):
 [veridict] monitoring "my-server"
 [veridict] search_docs ok 120ms
 [veridict] create_item ok 85ms
-[veridict] fetch_data FAIL 3201ms — timeout
+[veridict] fetch_data FAIL [timeout] 30201ms — timeout
 [veridict] search_docs ok 94ms
 ```
 
@@ -64,12 +82,25 @@ npx veridict trust my-server       # Trust judgment
 
 ## Trust judgment logic
 
-| Success Rate | Verdict | Meaning |
+| Blended Rate | Verdict | Meaning |
 |---|---|---|
 | >= 95% | yes | Trustworthy |
 | >= 80% | caution | Some failures detected |
 | < 80% | no | High failure rate |
 | < 10 executions | unknown | Insufficient data |
+
+**Blended rate** = recent 7-day success rate (70% weight) + all-time rate (30% weight).
+
+Recent performance matters more than history.
+
+## Failure types
+
+| Type | Detected when |
+|---|---|
+| `timeout` | Latency > 30s, or error contains "timeout"/"ETIMEDOUT" |
+| `validation` | Error contains "valid"/"schema"/"parse" |
+| `error` | All other failures |
+| `unknown` | Legacy data (pre-v0.2.0) |
 
 ## Options
 
@@ -118,9 +149,9 @@ Layer 3: SATP/XAIP (cross-org)      → "Should I trust this across boundaries?"
 ## How it works
 
 1. Wraps all registered MCP tool handlers
-2. Logs every execution: input hash, output hash, success/fail, latency
+2. Logs every execution: input hash, output hash, success/fail, failure type, latency
 3. Stores in local SQLite (`~/.veridict/executions.db`)
-4. Provides trust judgment based on execution history
+4. Provides trust judgment based on time-weighted execution history
 
 ## Future
 
